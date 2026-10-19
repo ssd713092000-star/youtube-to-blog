@@ -27,23 +27,27 @@ class GraphPersistence:
     store: AsyncPostgresStore
 
 
-def make_pool(conninfo: str, max_size: int = 10, iam_auth: bool = False) -> AsyncConnectionPool:
+def make_pool(conninfo: str, max_size: int = 10, iam_auth: bool = False, role: str = "") -> AsyncConnectionPool:
     # autocommit + dict_row are required by AsyncPostgresSaver/AsyncPostgresStore.
     # prepare_threshold=0 keeps it safe behind poolers that don't support prepared statements.
+    async def set_role(conn) -> None:
+        await conn.execute('SET ROLE "' + role.replace('"', '""') + '"')
+
     return AsyncConnectionPool(
         conninfo,
         min_size=1,
         max_size=max_size,
         open=False,
+        configure=set_role if role else None,
         connection_class=connection_class(iam_auth),
         kwargs={"autocommit": True, "row_factory": dict_row, "prepare_threshold": 0},
     )
 
 
 @asynccontextmanager
-async def graph_persistence(conninfo: str, max_size: int = 10, iam_auth: bool = False
+async def graph_persistence(conninfo: str, max_size: int = 10, iam_auth: bool = False, role: str = ""
                             ) -> AsyncIterator[GraphPersistence]:
-    pool = make_pool(conninfo, max_size, iam_auth)
+    pool = make_pool(conninfo, max_size, iam_auth, role)
     await pool.open(wait=True)
     try:
         yield GraphPersistence(
@@ -55,8 +59,8 @@ async def graph_persistence(conninfo: str, max_size: int = 10, iam_auth: bool = 
         await pool.close()
 
 
-async def setup_langgraph_tables(conninfo: str, iam_auth: bool = False) -> None:
+async def setup_langgraph_tables(conninfo: str, iam_auth: bool = False, role: str = "") -> None:
     """Run once from the migrate job (not at service startup)."""
-    async with graph_persistence(conninfo, max_size=2, iam_auth=iam_auth) as p:
+    async with graph_persistence(conninfo, max_size=2, iam_auth=iam_auth, role=role) as p:
         await p.checkpointer.setup()
         await p.store.setup()

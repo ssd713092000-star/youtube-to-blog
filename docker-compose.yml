@@ -9,8 +9,9 @@
 #
 # Graph segments run inside the API process (TASK_MODE=inline); Cloud Tasks + the worker are used
 # only in deployed environments. No GCP resources are created by this file.
-# Schema migrations against Cloud SQL run as the `tube2dev-migrate` Cloud Run job (infra/cloudbuild.yaml),
-# which also grants your account (_DEV_USERS) access, so run Cloud Build once before using this file.
+# Migrations run here as your Google account switched into the sa-migrate role (DB_MIGRATE_ROLE), so the
+# schema is owned by sa-migrate exactly as if the Cloud Run migrate job had created it. This needs the
+# one-time `app.cli bootstrap-db --dev-user <you>` step (see README).
 
 name: tube2dev
 
@@ -38,6 +39,18 @@ services:
       - ${GCLOUD_CONFIG_DIR}:/gcloud:ro
     restart: unless-stopped
 
+  migrate:
+    <<: *backend
+    command: ["python", "-m", "app.cli", "migrate"]
+    environment:
+      <<: *gcp-adc
+      ENV: local
+      DB_MIGRATE_ROLE: sa-migrate@${GCP_PROJECT}.iam
+      APP_DB_URL: postgresql+psycopg://${DB_IAM_USER:?set DB_IAM_USER in .env}@cloudsql-proxy:5432/tube2dev_app
+      CREDS_DB_URL: postgresql+psycopg://${DB_IAM_USER}@cloudsql-proxy:5432/tube2dev_credentials
+    depends_on: [cloudsql-proxy]
+    restart: on-failure:5
+
   api:
     <<: *backend
     environment:
@@ -49,7 +62,9 @@ services:
       CREDS_DB_URL: postgresql+psycopg://${DB_IAM_USER}@cloudsql-proxy:5432/tube2dev_credentials
       WEB_ORIGINS: http://localhost:3000
     ports: ["8000:8080"]
-    depends_on: [cloudsql-proxy]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/readyz')"]
       interval: 15s

@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     # true on Cloud Run (built-in /cloudsql socket): use an ADC OAuth token as the DB password.
     # false locally when the Auth Proxy runs with --auto-iam-authn.
     db_iam_auth: bool = False
+    # Run migrations as this role (SET ROLE), e.g. "sa-migrate@PROJECT.iam", so a developer who is a
+    # member of it can migrate Cloud SQL from their laptop and every object is still owned by sa-migrate.
+    db_migrate_role: str = ""
     # IAM DB users that migrations grant table privileges to, e.g. "sa-api@proj.iam"
     db_app_grantees: CsvList = Field(default_factory=list)
     db_creds_grantees: CsvList = Field(default_factory=list)

@@ -38,10 +38,12 @@ def _alembic_upgrade(name: str, url: str) -> None:
     command.upgrade(cfg, "head")
 
 
-async def _grant(conninfo: str, db: str, grantees: list[str], iam_auth: bool = False) -> None:
+async def _grant(conninfo: str, db: str, grantees: list[str], iam_auth: bool = False, role: str = "") -> None:
     from app.db.iam import connection_class
 
     async with await connection_class(iam_auth).connect(conninfo, autocommit=True) as conn:
+        if role:
+            await conn.execute(f"SET ROLE {_ident(role)}")
         for g in grantees:
             u = _ident(g)
             for stmt in (
@@ -69,13 +71,14 @@ async def migrate(s: Settings) -> None:
     log.info("alembic upgrade creds")
     await asyncio.to_thread(_alembic_upgrade, "creds", s.creds_db_url)
     log.info("langgraph checkpointer/store setup")
-    await setup_langgraph_tables(s.app_db_conninfo, s.db_iam_auth)
-    await _grant(s.app_db_conninfo, _dbname(s.app_db_conninfo), s.db_app_grantees, s.db_iam_auth)
-    await _grant(s.creds_db_conninfo, _dbname(s.creds_db_conninfo), s.db_creds_grantees, s.db_iam_auth)
+    await setup_langgraph_tables(s.app_db_conninfo, s.db_iam_auth, s.db_migrate_role)
+    await _grant(s.app_db_conninfo, _dbname(s.app_db_conninfo), s.db_app_grantees, s.db_iam_auth, s.db_migrate_role)
+    await _grant(s.creds_db_conninfo, _dbname(s.creds_db_conninfo), s.db_creds_grantees, s.db_iam_auth,
+                 s.db_migrate_role)
     log.info("migrations complete")
 
 
-async def bootstrap_db(s: Settings, migrate_user: str, host: str, port: int) -> None:
+async def bootstrap_db(s: Settings, migrate_user: str, host: str, port: int, dev_users: list[str]) -> None:
     """Connect as `postgres` (password auth via the proxy) and make the migrate IAM user own both DBs."""
     import psycopg
 
@@ -93,6 +96,13 @@ async def bootstrap_db(s: Settings, migrate_user: str, host: str, port: int) -> 
             await conn.execute(f"REVOKE ALL ON DATABASE {_ident(db)} FROM PUBLIC")
             await conn.execute("REVOKE CREATE ON SCHEMA public FROM PUBLIC")
             log.info("database %s now owned by %s; PUBLIC access revoked", db, migrate_user)
+    # Developers who migrate/run locally become members of the migrate role (they SET ROLE to it).
+    if dev_users:
+        dsn = f"host={host} port={port} dbname={_dbname(s.app_db_url)} user=postgres password={password}"
+        async with await psycopg.AsyncConnection.connect(dsn, autocommit=True) as conn:
+            for u in dev_users:
+                await conn.execute(f"GRANT {m} TO {_ident(u)}")
+                log.info("granted %s membership of %s", u, migrate_user)
 
 
 async def cleanup(s: Settings) -> None:
@@ -161,6 +171,7 @@ def main() -> None:
     b.add_argument("--migrate-user", required=True, help='e.g. "sa-migrate@PROJECT.iam"')
     b.add_argument("--host", default="127.0.0.1")
     b.add_argument("--port", type=int, default=5432)
+    b.add_argument("--dev-user", action="append", default=[], help="Google account(s) allowed to migrate/run locally")
     o = sub.add_parser("openapi")
     o.add_argument("--out", default="openapi.json")
     sub.add_parser("cleanup")
@@ -171,7 +182,7 @@ def main() -> None:
     if args.cmd == "migrate":
         run(migrate(s))
     elif args.cmd == "bootstrap-db":
-        run(bootstrap_db(s, args.migrate_user, args.host, args.port))
+        run(bootstrap_db(s, args.migrate_user, args.host, args.port, args.dev_user))
     elif args.cmd == "openapi":
         openapi(args.out)
     elif args.cmd == "cleanup":

@@ -20,6 +20,10 @@ def include_object(obj, name, type_, reflected, compare_to):
 
 
 def do_run(connection) -> None:
+    role = get_settings().db_migrate_role
+    if role:
+        connection.exec_driver_sql('SET ROLE "' + role.replace('"', '""') + '"')
+        connection.commit()  # SET ROLE is session-level; commit so Alembic manages its own transaction
     context.configure(connection=connection, target_metadata=target_metadata, include_object=include_object,
                       version_table="alembic_version_creds", compare_type=True)
     with context.begin_transaction():

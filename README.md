@@ -28,15 +28,14 @@ docker compose -f docker-compose.offline.yml up --build
 
 Stop with `docker compose -f docker-compose.offline.yml down` (add `-v` to wipe the data).
 
-### Option B: against your GCP project (ADC)
+### Option B: locally against your GCP resources (ADC, no deployment)
 
-Run this once the resources from `infra/bootstrap.sh` exist.
+Run this once the resources from `infra/bootstrap.sh` exist and the one-time `bootstrap-db` step is done
+(see "GCP resources" below). Containers run on your machine; Cloud SQL, GCS, KMS and Firebase are the real ones.
 
 ```bash
-gcloud auth application-default login \
-  --scopes=https://www.googleapis.com/auth/cloud-platform,https://www.googleapis.com/auth/sqlservice.login
 cp .env.example .env                    # GCP_PROJECT, CLOUD_SQL_INSTANCE, DB_IAM_USER, GCLOUD_CONFIG_DIR, Firebase web config
-cp backend/.env.example backend/.env    # GCS_BUCKET, KMS_KEY_NAME, ...
+cp backend/.env.example backend/.env    # GCS_BUCKET, KMS_KEY_NAME, FIREBASE_PROJECT_ID, AUTH_MODE
 docker compose up --build
 ```
 
@@ -68,6 +67,17 @@ cd frontend && npm test && npm run typecheck
 ```bash
 cd backend && uv run python -m app.cli openapi --out openapi.json
 cd ../frontend && npm run gen:api
+```
+
+## GCP resources (us-east1)
+
+```bash
+PROJECT=<id> ./infra/bootstrap.sh       # creates everything; prints the values for backend/.env
+# one-time: hand both databases to sa-migrate and let your account migrate/run locally
+./cloud-sql-proxy.x64.exe --port 5432 <id>:us-east1:tube2dev-pg &
+POSTGRES_PASSWORD="$(gcloud secrets versions access latest --secret=postgres-password)" \
+  uv run --directory backend python -m app.cli bootstrap-db \
+  --migrate-user "sa-migrate@<id>.iam" --dev-user "<your-google-email>"
 ```
 
 ## Deploy (GCP, us-east1)

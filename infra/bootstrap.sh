@@ -131,7 +131,7 @@ Done. Next steps:
  1. Run the cloud-sql-proxy locally, then hand both databases to the migrate user (one time):
       cloud-sql-proxy --port 5432 $PROJECT:$REGION:$INSTANCE &
       POSTGRES_PASSWORD="\$(gcloud secrets versions access latest --secret=postgres-password --project $PROJECT)" \\
-        uv run --directory backend python -m app.cli bootstrap-db --migrate-user "sa-migrate@$PROJECT.iam"
+        uv run --directory backend python -m app.cli bootstrap-db --migrate-user "sa-migrate@$PROJECT.iam" --dev-user "$ME"
  2. Enable Firebase Authentication (Google + Email link) in the Firebase console for $PROJECT,
     add your web domain to Authorized domains, and copy the web config into .env / Cloud Build substitutions.
  3. Deploy with Cloud Build (also runs migrations and grants your account DB access for local dev):

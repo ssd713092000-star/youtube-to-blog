@@ -1,0 +1,94 @@
+# Tube2Dev against your real GCP project (Cloud SQL, GCS, KMS, Firebase) using Application Default
+# Credentials from your machine. Prereqs:
+#   gcloud auth application-default login \
+#     --scopes=https://www.googleapis.com/auth/cloud-platform,https://www.googleapis.com/auth/sqlservice.login
+#   cp .env.example .env            (compose variables)
+#   cp backend/.env.example backend/.env
+#   docker compose up --build
+# Web: http://localhost:3000   API: http://localhost:8000/docs
+#
+# Graph segments run inside the API process (TASK_MODE=inline); Cloud Tasks + the worker are used
+# only in deployed environments. No GCP resources are created by this file.
+# Schema migrations against Cloud SQL run as the `tube2dev-migrate` Cloud Run job (infra/cloudbuild.yaml),
+# which also grants your account (_DEV_USERS) access, so run Cloud Build once before using this file.
+
+name: tube2dev
+
+x-gcp-adc: &gcp-adc
+  GOOGLE_APPLICATION_CREDENTIALS: /gcloud/application_default_credentials.json
+  GOOGLE_CLOUD_PROJECT: ${GCP_PROJECT:?set GCP_PROJECT in .env}
+
+x-backend: &backend
+  build: ./backend
+  image: tube2dev-backend:local
+  env_file: [backend/.env]
+  volumes:
+    - ${GCLOUD_CONFIG_DIR:?set GCLOUD_CONFIG_DIR in .env}:/gcloud:ro
+
+services:
+  cloudsql-proxy:
+    image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.14.3
+    command:
+      - --auto-iam-authn
+      - --address=0.0.0.0
+      - --port=5432
+      - ${CLOUD_SQL_INSTANCE:?set CLOUD_SQL_INSTANCE=project:us-east1:tube2dev-pg in .env}
+    environment: *gcp-adc
+    volumes:
+      - ${GCLOUD_CONFIG_DIR}:/gcloud:ro
+    restart: unless-stopped
+
+  api:
+    <<: *backend
+    environment:
+      <<: *gcp-adc
+      ENV: local
+      SERVICE_NAME: tube2dev-api
+      TASK_MODE: inline
+      APP_DB_URL: postgresql+psycopg://${DB_IAM_USER:?set DB_IAM_USER in .env}@cloudsql-proxy:5432/tube2dev_app
+      CREDS_DB_URL: postgresql+psycopg://${DB_IAM_USER}@cloudsql-proxy:5432/tube2dev_credentials
+      WEB_ORIGINS: http://localhost:3000
+    ports: ["8000:8080"]
+    depends_on: [cloudsql-proxy]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/readyz')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  # Optional: exercise the Cloud Tasks target locally (OIDC is skipped when ENV=local).
+  #   docker compose --profile worker up
+  worker:
+    <<: *backend
+    profiles: [worker]
+    command: ["sh", "-c", "exec uvicorn app.main_worker:app --host 0.0.0.0 --port 8080"]
+    environment:
+      <<: *gcp-adc
+      ENV: local
+      SERVICE_NAME: tube2dev-worker
+      APP_DB_URL: postgresql+psycopg://${DB_IAM_USER}@cloudsql-proxy:5432/tube2dev_app
+      CREDS_DB_URL: postgresql+psycopg://${DB_IAM_USER}@cloudsql-proxy:5432/tube2dev_credentials
+    ports: ["8001:8080"]
+    depends_on: [cloudsql-proxy]
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+        NEXT_PUBLIC_AUTH_MODE: ${WEB_AUTH_MODE:-firebase}
+        NEXT_PUBLIC_RELEASE: local
+        NEXT_PUBLIC_FIREBASE_API_KEY: ${FIREBASE_API_KEY:-}
+        NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${FIREBASE_AUTH_DOMAIN:-}
+        NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${GCP_PROJECT}
+        NEXT_PUBLIC_FIREBASE_APP_ID: ${FIREBASE_APP_ID:-}
+    image: tube2dev-web:local
+    environment:
+      GCP_PROJECT: ${GCP_PROJECT}
+    ports: ["3000:8080"]
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped

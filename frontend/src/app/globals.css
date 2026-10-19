@@ -1,0 +1,126 @@
+@import "tailwindcss";
+
+/* Dark mode follows the `.dark` class set by next-themes. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Design tokens from the Tube2Dev mockups: stone neutrals, one indigo accent (#5b5bd6) used only for
+   primary actions and live state, Geist for UI and Geist Mono for timestamps, tags, IDs and money. */
+:root {
+  --bg: #fafaf9;
+  --surface: #ffffff;
+  --sidebar: #f5f5f4;
+  --border: #e7e5e4;
+  --border-strong: #d6d3d1;
+  --fg: #1c1917;
+  --fg-muted: #57534e;
+  --fg-subtle: #78716c;
+  --fg-faint: #a8a29e;
+  --accent: #5b5bd6;
+  --accent-hover: #4343b8;
+  --accent-tint: #ececfb;
+  --success: #166534;
+  --success-bg: #dcfce7;
+  --success-tint: #f0fdf4;
+  --warning: #b45309;
+  --warning-strong: #92400e;
+  --warning-bg: #fef3c7;
+  --danger: #b91c1c;
+  --danger-bg: #fee2e2;
+}
+
+.dark {
+  --bg: #0c0a09;
+  --surface: #1c1917;
+  --sidebar: #141210;
+  --border: #292524;
+  --border-strong: #44403c;
+  --fg: #fafaf9;
+  --fg-muted: #d6d3d1;
+  --fg-subtle: #a8a29e;
+  --fg-faint: #78716c;
+  --accent: #7c7cf0;
+  --accent-hover: #9696f5;
+  --accent-tint: #23234a;
+  --success: #4ade80;
+  --success-bg: #14301f;
+  --success-tint: #0f2418;
+  --warning: #fbbf24;
+  --warning-strong: #fcd34d;
+  --warning-bg: #3a2a0a;
+  --danger: #f87171;
+  --danger-bg: #3b1212;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-sidebar: var(--sidebar);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-subtle: var(--fg-subtle);
+  --color-fg-faint: var(--fg-faint);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-tint: var(--accent-tint);
+  --color-success: var(--success);
+  --color-success-bg: var(--success-bg);
+  --color-success-tint: var(--success-tint);
+  --color-warning: var(--warning);
+  --color-warning-strong: var(--warning-strong);
+  --color-warning-bg: var(--warning-bg);
+  --color-danger: var(--danger);
+  --color-danger-bg: var(--danger-bg);
+  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --animate-pulse-node: t2d-pulse 1.8s ease-out infinite;
+  --animate-shimmer: t2d-shimmer 1.6s ease-in-out infinite;
+  --animate-rise: t2d-rise 0.25s ease-out both;
+}
+
+@keyframes t2d-pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent); }
+  70% { box-shadow: 0 0 0 10px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+@keyframes t2d-shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(250%); }
+}
+@keyframes t2d-rise {
+  0% { opacity: 0; transform: translateY(6px); }
+  100% { opacity: 1; transform: none; }
+}
+
+html, body { background: var(--bg); color: var(--fg); }
+body { font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+*:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+/* dev.to-like article rendering for the preview pane */
+.prose-devto { font-size: 15px; line-height: 1.7; color: var(--fg); }
+.prose-devto h1 { font-size: 1.9em; font-weight: 700; margin: 1em 0 0.5em; line-height: 1.25; }
+.prose-devto h2 { font-size: 1.45em; font-weight: 700; margin: 1.6em 0 0.5em; line-height: 1.3; }
+.prose-devto h3 { font-size: 1.2em; font-weight: 600; margin: 1.3em 0 0.4em; }
+.prose-devto p { margin: 0.8em 0; }
+.prose-devto ul { list-style: disc; padding-left: 1.4em; margin: 0.8em 0; }
+.prose-devto ol { list-style: decimal; padding-left: 1.4em; margin: 0.8em 0; }
+.prose-devto a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+.prose-devto blockquote { border-left: 4px solid var(--border-strong); padding-left: 1em; color: var(--fg-muted); margin: 1em 0; }
+.prose-devto code { font-family: var(--font-mono); font-size: 0.88em; background: var(--sidebar); padding: 0.1em 0.35em; border-radius: 4px; }
+.prose-devto pre { background: #1c1917; color: #f5f5f4; padding: 14px 16px; border-radius: 8px; overflow-x: auto; margin: 1em 0; }
+.prose-devto pre code { background: transparent; padding: 0; color: inherit; }
+.prose-devto table { border-collapse: collapse; margin: 1em 0; display: block; overflow-x: auto; }
+.prose-devto th, .prose-devto td { border: 1px solid var(--border); padding: 6px 10px; }
+.prose-devto mark { background: var(--warning-bg); color: inherit; border-bottom: 2px solid var(--warning); }
+
+/* highlight.js tokens (dark code blocks) */
+.hljs-keyword, .hljs-selector-tag, .hljs-built_in { color: #c4b5fd; }
+.hljs-string, .hljs-attr { color: #86efac; }
+.hljs-number, .hljs-literal { color: #fdba74; }
+.hljs-comment { color: #a8a29e; font-style: italic; }
+.hljs-title, .hljs-function { color: #93c5fd; }

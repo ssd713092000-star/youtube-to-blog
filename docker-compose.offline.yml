@@ -1,0 +1,86 @@
+# Tube2Dev fully on your machine, no GCP needed (useful before the GCP resources exist):
+#   docker compose -f docker-compose.offline.yml up --build
+# Web: http://localhost:3000 (sign in with any email: dev auth)   API: http://localhost:8000/docs
+#
+# Swaps Cloud SQL -> local Postgres, GCS -> a local volume, KMS -> local AES-GCM key, Firebase ->
+# dev auth. All of these are refused by the backend outside ENV=local. YouTube, OpenRouter and dev.to
+# are real: add your own keys under Settings -> Integrations in the app.
+
+name: tube2dev-offline
+
+x-backend-env: &backend-env
+  ENV: local
+  LOG_LEVEL: INFO
+  AUTH_MODE: dev
+  TASK_MODE: inline
+  BLOB_BACKEND: local
+  LOCAL_BLOB_DIR: /data/blobs
+  GCS_BUCKET: local
+  CIPHER_BACKEND: local
+  # Dev-only key. Never reuse it anywhere real.
+  LOCAL_ENCRYPTION_KEY: ${LOCAL_ENCRYPTION_KEY:-ZGV2LW9ubHkta2V5LWRvLW5vdC11c2UtaW4tcHJvZCE=}
+  APP_DB_URL: postgresql+psycopg://postgres:postgres@postgres:5432/tube2dev_app
+  CREDS_DB_URL: postgresql+psycopg://postgres:postgres@postgres:5432/tube2dev_credentials
+  WEB_ORIGINS: http://localhost:3000
+  DEFAULT_MODEL: ${DEFAULT_MODEL:-deepseek/deepseek-v4.1-flash}
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infra/local/init-dbs.sql:/docker-entrypoint-initdb.d/init-dbs.sql:ro
+    ports: ["5432:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    build: ./backend
+    image: tube2dev-backend:local
+    command: ["python", "-m", "app.cli", "migrate"]
+    environment: *backend-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    image: tube2dev-backend:local
+    environment:
+      <<: *backend-env
+      SERVICE_NAME: tube2dev-api
+    volumes:
+      - blobdata:/data
+    ports: ["8000:8080"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/readyz')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+        NEXT_PUBLIC_AUTH_MODE: dev
+        NEXT_PUBLIC_RELEASE: offline
+    image: tube2dev-web:offline
+    ports: ["3000:8080"]
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  blobdata:

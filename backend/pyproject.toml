@@ -1,0 +1,52 @@
+[project]
+name = "tube2dev-backend"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = [
+    "alembic>=1.20.0",
+    "cryptography>=50.0.2",
+    "fastapi>=0.144.0",
+    "firebase-admin>=7.7.0",
+    "google-auth>=2.62.0",
+    "google-cloud-kms>=3.18.0",
+    "google-cloud-secret-manager>=2.31.0",
+    "google-cloud-storage>=3.17.1",
+    "google-cloud-tasks>=2.26.0",
+    "httpx>=0.28.1",
+    "langchain>=1.4.6",
+    "langchain-core>=1.6.12",
+    "langchain-openrouter>=0.2.9",
+    "langgraph>=1.2.16",
+    "langgraph-checkpoint-postgres>=3.2.0",
+    "psycopg[binary,pool]>=3.3.6",
+    "pydantic-settings>=2.16.0",
+    "python-json-logger>=4.2.0",
+    "sqlalchemy[asyncio]>=2.1.5",
+    "sse-starlette>=3.5.0",
+    "uvicorn[standard]>=0.54.0",
+    "youtube-transcript-api>=1.2.4",
+    "yt-dlp>=2026.8.19",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "ruff>=0.17.1",
+    "testcontainers[postgres]>=4.15.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+pythonpath = ["."]
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "ASYNC"]
+ignore = ["E501", "B008"]

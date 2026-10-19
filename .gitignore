@@ -8,18 +8,18 @@ __pycache__/
 
 # Distribution / packaging
 .Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
+/build/
+/develop-eggs/
+/dist/
+/downloads/
+/eggs/
 .eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
+/lib/
+/lib64/
+/parts/
+/sdist/
+/var/
+/wheels/
 share/python-wheels/
 *.egg-info/
 .installed.cfg
@@ -153,7 +153,7 @@ activemq-data/
 .env
 .envrc
 .venv
-env/
+/env/
 venv/
 ENV/
 env.bak/
@@ -218,3 +218,42 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+__pycache__
+.ruff_cache
+UI mockups for Tube2Dev
+
+# --- Tube2Dev ---
+# (Python packaging dirs above are root-anchored so they don't swallow app folders like frontend/src/lib)
+
+# Secrets and local env files: only the *.example templates are committed
+.env
+.env.*
+!.env.example
+*.pem
+*-key.json
+service-account*.json
+application_default_credentials.json
+
+# Local data and generated files
+backend/.data/
+backend/openapi.json
+notebooks/published_videos.json
+notebooks/.ipynb_checkpoints/
+output.png
+*.log
+cloud-sql-proxy*
+!infra/**/cloud-sql-proxy*
+
+# Node / Next.js
+node_modules/
+frontend/.next/
+frontend/out/
+frontend/coverage/
+frontend/next-env.d.ts
+*.tsbuildinfo
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
